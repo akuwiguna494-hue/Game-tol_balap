@@ -1,1 +1,59 @@
-
+{
+ "name": "Build APK",
+ "on": {
+  "push": {
+   "branches": [
+    "main",
+    "master"
+   ]
+  },
+  "workflow_dispatch": null
+ },
+ "jobs": {
+  "build": {
+   "runs-on": "ubuntu-latest",
+   "steps": [
+    {
+     "uses": "actions/checkout@v4"
+    },
+    {
+     "uses": "actions/setup-node@v4",
+     "with": {
+      "node-version": 20
+     }
+    },
+    {
+     "uses": "actions/setup-java@v4",
+     "with": {
+      "distribution": "temurin",
+      "java-version": 17
+     }
+    },
+    {
+     "name": "Siapkan proyek Capacitor",
+     "run": "mkdir -p www\ncp index.html www/index.html\nnpm init -y\nnpm install @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6\ncat > capacitor.config.json <<'JSON'\n{\"appId\":\"com.tolbalap.game\",\"appName\":\"Tol Balap\",\"webDir\":\"www\",\"backgroundColor\":\"#05080f\"}\nJSON\nnpx cap add android\n"
+    },
+    {
+     "name": "Kunci layar potret",
+     "run": "sed -i 's/<activity\\b/<activity android:screenOrientation=\"portrait\"/' android/app/src/main/AndroidManifest.xml\n"
+    },
+    {
+     "name": "Buat ikon aplikasi (opsional)",
+     "continue-on-error": true,
+     "run": "sudo apt-get install -y imagemagick >/dev/null 2>&1 || true\nconvert -size 432x432 xc:none -fill '#ffc928' -draw 'polygon 216,110 316,320 266,320 216,210 166,320 116,320' fg.png\nconvert -size 432x432 xc:'#0b1020' fg.png -composite sq.png\nfor d in mdpi:48:108 hdpi:72:162 xhdpi:96:216 xxhdpi:144:324 xxxhdpi:192:432; do\n IFS=: read n a f <<< \"$d\"\n dir=android/app/src/main/res/mipmap-$n\n convert sq.png -resize ${a}x${a} $dir/ic_launcher.png\n convert sq.png -resize ${a}x${a} $dir/ic_launcher_round.png\n convert fg.png -resize ${f}x${f} $dir/ic_launcher_foreground.png\ndone\nsed -i 's/#FFFFFF/#0b1020/I' android/app/src/main/res/values/ic_launcher_background.xml\n"
+    },
+    {
+     "name": "Sinkronkan dan build APK",
+     "run": "npx cap sync android\ncd android\nchmod +x gradlew\n./gradlew assembleDebug\n"
+    },
+    {
+     "uses": "actions/upload-artifact@v4",
+     "with": {
+      "name": "tol-balap-apk",
+      "path": "android/app/build/outputs/apk/debug/app-debug.apk"
+     }
+    }
+   ]
+  }
+ }
+}
